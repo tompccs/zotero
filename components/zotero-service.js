@@ -579,8 +579,8 @@ ZoteroCommandLineHandler.prototype = {
 					if (!DebuggerServer.initialized) {
 						dump("Initializing devtools server\n");
 						DebuggerServer.init();
+						DebuggerServer.registerAllActors();
 						DebuggerServer.allowChromeProcess = true;
-						DebuggerServer.addBrowserActors();
 					}
 					
 					let listener = DebuggerServer.createListener();
