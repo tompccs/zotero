@@ -166,6 +166,36 @@ Zotero.Server.DataListener = function(iStream, oStream) {
 	this.sStream.init(iStream);
 	
 	this.foundReturn = false;
+
+	// check preferences to see if any inbound connection is allowed
+	this.allowAllInbound = false;
+	let profilesParent = OS.Path.dirname(Zotero.Profile.getOtherAppProfilesDir());
+	Zotero.debug("Looking for Firefox profile in " + profilesParent);
+	
+	// get default profile
+	var defProfile;
+	try {
+		defProfile = yield Zotero.Profile.getDefaultInProfilesDir(profilesParent);
+	}
+	catch (e) {
+		Zotero.debug("An error occurred locating the Firefox profile; "
+			+ "not attempting to migrate from Zotero for Firefox");
+		Zotero.logError(e);
+		Zotero.fxProfileAccessError = true;
+	}
+	if (defProfile) {
+		let profileDir = defProfile[0];
+		Zotero.debug("Found default profile at " + profileDir);
+		let prefsFile = OS.Path.join(profileDir, "prefs.js");
+		if (yield OS.File.exists(prefsFile)) {
+			let prefs = yield Zotero.Profile.readPrefsFromFile(prefsFile);
+			
+			// Check for data dir pref
+			if (prefs['extensions.zotero.httpServer.allowAllInbound']){
+				this.allowAllInbound = true;
+			}
+		}
+	}
 }
 
 /*
@@ -264,7 +294,7 @@ Zotero.Server.DataListener.prototype._headerFinished = function() {
 	if (!Zotero.isServer) {
 		// Make sure the Host header is set to localhost/127.0.0.1 to prevent DNS rebinding attacks
 		const hostRe = /^(localhost|127\.0\.0\.1)(:[0-9]+)?$/i;
-		if (!hostRe.test(this.headers.host)) {
+		if (!hostRe.test(this.headers.host) && !this.allowAllInbound) {
 			this._requestFinished(this._generateResponse(400, "text/plain", "Invalid Host header\n"));
 			return;
 		}
